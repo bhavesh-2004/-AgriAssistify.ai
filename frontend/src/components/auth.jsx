@@ -43,7 +43,7 @@ function CheckAuth({ children, protectedRoute = true }) {
           // Authenticated user visits login → redirect to dashboard
           else if (currentPath === "/login") {
             console.log("✅ Already authenticated on login page, redirecting to dashboard");
-            navigate("/dashboard", { replace: true });
+            navigate("/", { replace: true });
           } 
           // Home page and other public pages → allow access
           else {

@@ -1,52 +1,106 @@
 /**
- * HEROBANNER.JSX - AgriAssistify.ai Hero Banner
- * 
- * Professional hero banner for the Intelligent Agriculture Issue Tracker homepage
- * Features agricultural background image with overlay text and call-to-action buttons
- * Matches the AgriPilot.ai design with AgriAssistify.ai branding
+ * BANNER.JSX - AgriAssistify.ai Hero Banner with Integrated Carousel
+ * Full-screen banner with changing background images (no slide counter)
  */
 
-// ==================== IMPORTS ====================
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
-// ==================== HERO BANNER COMPONENT ====================
-const HeroBanner = () => {
+const Banner = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // 4 Agricultural Background Images
+  const backgroundImages = [
+    {
+      id: 1,
+      image: "https://www.lek.com/sites/default/files/hero-images/insights/PT_argo-survey_hero_0.jpg",
+      title: "Smart Farming Technology"
+    },
+    {
+      id: 2,
+      image: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80", 
+      title: "Sustainable Agriculture"
+    },
+    {
+      id: 3,
+      image: "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80",
+      title: "Modern Farm Equipment"
+    },
+    {
+      id: 4,
+      image: "https://www.onsetcomp.com/sites/default/files/styles/hero_banner/public/2022-09/HERO-Disease-Pest-Management1.jpg?itok=uMcpwNCj",
+      title: "Monitoring Solutions for Disease & Pest Management"
+    }
+  ];
+
+  // Auto-slide every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % backgroundImages.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [backgroundImages.length]);
+
+  // Navigation functions
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + backgroundImages.length) % backgroundImages.length);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % backgroundImages.length);
+  };
+
+  const goToSlide = (index) => {
+    setCurrentSlide(index);
+  };
+
   return (
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
-      {/* ==================== BACKGROUND IMAGE WITH OVERLAY ==================== */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url('https://tse4.mm.bing.net/th/id/OIP.K59k2G0bnAjlp3YwYp6tYwHaEK?pid=Api&P=0&h=180')`,
-          // Alternative: You can replace this with a real agricultural image
-          // backgroundImage: "url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80')"
-        }}
+      
+      {/* Carousel Background Images */}
+      <div className="absolute inset-0">
+        {backgroundImages.map((slide, index) => (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${
+              index === currentSlide ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ backgroundImage: `url('${slide.image}')` }}
+          >
+            {/* Dark overlay for text readability */}
+            <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+            
+            {/* Green gradient overlay for agricultural theme */}
+            <div className="absolute inset-0 bg-gradient-to-br from-green-900/30 via-transparent to-green-800/20"></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Navigation Arrows */}
+      <button 
+        onClick={prevSlide}
+        className="absolute left-6 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-full p-4 transition-all duration-200 z-20 group"
       >
-        {/* Dark overlay for better text readability */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-        
-        {/* Green gradient overlay to match agricultural theme */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-800/20 via-green-700/30 to-green-900/40"></div>
-      </div>
+        <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
 
-      {/* ==================== FLOATING AGRICULTURE ELEMENTS ==================== */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Floating crop icons */}
-        <div className="absolute top-20 left-20 text-6xl text-green-200 opacity-20 animate-bounce">🌾</div>
-        <div className="absolute top-40 right-32 text-4xl text-green-200 opacity-30 animate-pulse delay-1000">🌱</div>
-        <div className="absolute bottom-32 left-16 text-5xl text-green-200 opacity-25 animate-bounce delay-2000">🚜</div>
-        <div className="absolute bottom-20 right-20 text-4xl text-green-200 opacity-20 animate-pulse delay-3000">🌽</div>
-        <div className="absolute top-1/2 left-32 text-3xl text-green-200 opacity-15 animate-bounce delay-4000">🍃</div>
-        <div className="absolute top-1/4 right-1/4 text-4xl text-green-200 opacity-25 animate-pulse delay-500">💧</div>
-      </div>
+      <button 
+        onClick={nextSlide}
+        className="absolute right-6 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white rounded-full p-4 transition-all duration-200 z-20 group"
+      >
+        <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
 
-      {/* ==================== MAIN CONTENT ==================== */}
+      {/* Main Content Overlay */}
       <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
         
-        {/* ==================== MAIN HEADLINE ==================== */}
-        <div className="mb-8 animate-fade-in-up">
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6">
+        {/* Main Headline */}
+        <div className="mb-8">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight mb-6 drop-shadow-2xl">
             Unlock values with
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-200 to-yellow-400">
@@ -55,20 +109,20 @@ const HeroBanner = () => {
           </h1>
         </div>
 
-        {/* ==================== SUBTITLE ==================== */}
-        <div className="mb-10 animate-fade-in-up animation-delay-200">
-          <p className="text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed">
+        {/* Subtitle */}
+        <div className="mb-10">
+          <p className="text-xl md:text-2xl text-gray-200 max-w-4xl mx-auto leading-relaxed drop-shadow-lg">
             Transform your agricultural operations with our intelligent farm issue tracking platform. 
             <span className="text-yellow-300 font-semibold"> AgriAssistify.ai </span> 
             connects farmers, workers, and experts through AI-powered solutions.
           </p>
         </div>
 
-        {/* ==================== CALL-TO-ACTION BUTTONS ==================== */}
-        <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12 animate-fade-in-up animation-delay-400">
+        {/* Call-to-Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-16">
           <Link
             to="/signup"
-            className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-green-900 bg-yellow-400 rounded-lg shadow-xl hover:bg-yellow-300 transform hover:scale-105 transition-all duration-300 hover:shadow-2xl"
+            className="group inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-green-900 bg-yellow-400 rounded-lg shadow-2xl hover:bg-yellow-300 transform hover:scale-105 transition-all duration-300"
           >
             <span className="mr-2">🚀</span>
             Start Your Journey
@@ -79,7 +133,7 @@ const HeroBanner = () => {
           
           <Link
             to="/about"
-            className="group inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white border-2 border-white rounded-lg hover:bg-white hover:text-green-800 transform hover:scale-105 transition-all duration-300 shadow-xl hover:shadow-2xl"
+            className="group inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white border-2 border-white rounded-lg hover:bg-white hover:text-green-800 transform hover:scale-105 transition-all duration-300 shadow-xl"
           >
             <span className="mr-2">📚</span>
             Learn More
@@ -89,58 +143,31 @@ const HeroBanner = () => {
           </Link>
         </div>
 
-        {/* ==================== KEY FEATURES PREVIEW ==================== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 animate-fade-in-up animation-delay-600">
-          
-          {/* AI-Powered Analysis */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105">
-            <div className="text-4xl mb-4">🤖</div>
-            <h3 className="text-xl font-bold text-white mb-2">AI-Powered Analysis</h3>
-            <p className="text-gray-200">Advanced AI analyzes farm issues and provides intelligent solutions instantly</p>
-          </div>
-
-          {/* Expert Network */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105">
-            <div className="text-4xl mb-4">👥</div>
-            <h3 className="text-xl font-bold text-white mb-2">Expert Network</h3>
-            <p className="text-gray-200">Connect with agricultural experts and experienced field workers</p>
-          </div>
-
-          {/* Smart Tracking */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105">
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-xl font-bold text-white mb-2">Smart Tracking</h3>
-            <p className="text-gray-200">Track issue resolution progress with intelligent insights and analytics</p>
-          </div>
-        </div>
-
-        {/* ==================== STATISTICS STRIP ==================== */}
-        <div className="mt-16 animate-fade-in-up animation-delay-800">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-              <div>
-                <div className="text-3xl font-bold text-yellow-300 mb-1">1000+</div>
-                <div className="text-sm text-gray-200">Issues Resolved</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-yellow-300 mb-1">500+</div>
-                <div className="text-sm text-gray-200">Active Farmers</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-yellow-300 mb-1">200+</div>
-                <div className="text-sm text-gray-200">Expert Workers</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-yellow-300 mb-1">95%</div>
-                <div className="text-sm text-gray-200">Success Rate</div>
-              </div>
-            </div>
-          </div>
+        {/* Current Slide Title */}
+        <div className="mb-8">
+          <p className="text-lg text-yellow-300 font-semibold bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full inline-block">
+            {backgroundImages[currentSlide].title}
+          </p>
         </div>
       </div>
 
-      {/* ==================== SCROLL DOWN INDICATOR ==================== */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+      {/* Slide Indicators */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-3 z-20">
+        {backgroundImages.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => goToSlide(index)}
+            className={`w-4 h-4 rounded-full transition-all duration-300 ${
+              currentSlide === index 
+                ? 'bg-yellow-400 scale-125 shadow-lg' 
+                : 'bg-white/50 hover:bg-white/75 hover:scale-110'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Scroll Down Indicator */}
+      <div className="absolute bottom-8 right-8 animate-bounce z-20">
         <div className="flex flex-col items-center text-white opacity-70">
           <span className="text-sm mb-2">Scroll to explore</span>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,4 +179,4 @@ const HeroBanner = () => {
   )
 }
 
-export default HeroBanner
+export default Banner
