@@ -11,7 +11,8 @@ import {
     resolveTicket,
     closeTicket,
     getStats,
-    getMyTickets
+    getMyTickets,
+    regenerateAISolution  // NEW: Add this
 } from "../controllers/ticket.js";
 import { authenticate, authorize } from "../middlewares/auth.js";
 
@@ -31,6 +32,15 @@ const commentLimiter = rateLimit({
     message: {
         success: false,
         error: "Too many comments. Please wait before commenting again."
+    }
+});
+
+const aiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: {
+        success: false,
+        error: "Too many AI requests. Please wait before regenerating."
     }
 });
 
@@ -60,6 +70,9 @@ router.post("/:id/assign", authenticate, authorize(['moderator', 'admin']), assi
 router.post("/:id/comment", authenticate, commentLimiter, addComment);
 router.post("/:id/resolve", authenticate, resolveTicket);
 router.post("/:id/close", authenticate, closeTicket);
+
+// AI Solution routes (NEW)
+router.post("/:id/regenerate-ai", authenticate, aiLimiter, regenerateAISolution);
 
 // Error handling
 router.use((error, req, res, next) => {

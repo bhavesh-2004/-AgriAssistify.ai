@@ -1,26 +1,21 @@
 /**
  * TICKETS.JSX - AgriAssistify.ai Farm Issues Dashboard
- * 
- * Main dashboard for viewing and creating farm issue tickets
- * Features role-based access, agriculture-specific forms, and AI-powered issue tracking
+ * Enhanced with AI Integration Status
  */
 
-// ==================== IMPORTS ====================
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-// ==================== TICKETS DASHBOARD COMPONENT ====================
 export default function Tickets() {
-  // ==================== STATE MANAGEMENT ====================
   const [form, setForm] = useState({
     title: "",
     description: "",
-    issueType: "pest-attack",  // ✅ Fixed: Added hyphen
+    issueType: "pest-attack",
     urgencyLevel: "medium",
     fieldLocation: "",
-    affectedCrop: "",  // ✅ Fixed: Changed from cropType
+    affectedCrop: "",
     estimatedImpact: ""
   });
   
@@ -34,7 +29,6 @@ export default function Tickets() {
 
   const token = localStorage.getItem("token");
 
-  // ==================== AGRICULTURE ISSUE TYPES ====================
   const issueTypes = [
     { value: "pest-attack", label: "🐛 Pest Attack", description: "Insects, worms, or pests affecting crops" },
     { value: "irrigation", label: "💧 Irrigation Issues", description: "Water supply or irrigation system problems" },
@@ -44,7 +38,6 @@ export default function Tickets() {
     { value: "other", label: "📋 Other Issues", description: "Other agricultural problems" }
   ];
 
-  // ==================== FETCH USER DATA ====================
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
@@ -52,7 +45,6 @@ export default function Tickets() {
     }
   }, []);
 
-  // ==================== FETCH TICKETS ====================
   const fetchTickets = async () => {
     try {
       setFetchingTickets(true);
@@ -84,17 +76,19 @@ export default function Tickets() {
   useEffect(() => {
     if (token) {
       fetchTickets();
+      
+      // Auto-refresh every 10 seconds to catch new AI solutions
+      const interval = setInterval(fetchTickets, 10000);
+      return () => clearInterval(interval);
     }
   }, [token]);
 
-  // ==================== FORM HANDLERS ====================
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
     setError("");
   };
 
-  // ==================== FORM VALIDATION ====================
   const validateForm = () => {
     if (!form.title.trim()) {
       setError("Issue title is required");
@@ -111,7 +105,6 @@ export default function Tickets() {
     return true;
   };
 
-  // ==================== SUBMIT HANDLER ====================
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -121,8 +114,6 @@ export default function Tickets() {
     setError("");
     
     try {
-      console.log("Submitting ticket:", form);  // Debug log
-      
       const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/api/tickets`, {
         method: "POST",
         headers: {
@@ -133,7 +124,6 @@ export default function Tickets() {
       });
 
       const data = await res.json();
-      console.log("Response:", data);  // Debug log
 
       if (res.ok) {
         setForm({
@@ -145,7 +135,7 @@ export default function Tickets() {
           affectedCrop: "",
           estimatedImpact: ""
         });
-        setSuccess("Farm issue reported successfully! 🌾");
+        setSuccess("Farm issue reported successfully! 🌾 AI is analyzing...");
         setShowCreateForm(false);
         fetchTickets();
         
@@ -161,30 +151,27 @@ export default function Tickets() {
     }
   };
 
-  // ==================== GET STATUS COLOR ====================
   const getStatusColor = (status) => {
     switch (status) {
-      case 'open': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'analyzing': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'open': return 'bg-green-100 text-green-800 border-green-200';
       case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'resolved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'resolved': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  // ==================== GET ISSUE TYPE ICON ====================
   const getIssueTypeIcon = (issueType) => {
     const type = issueTypes.find(t => t.value === issueType);
     return type ? type.label.split(' ')[0] : '📋';
   };
 
-  // ==================== RENDER COMPONENT ====================
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
       
       <div className="flex-grow max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 w-full">
-        {/* ==================== HEADER ==================== */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -192,24 +179,22 @@ export default function Tickets() {
                 🌾 Farm Issues
               </h1>
               <p className="text-gray-600 mt-2">
-                Intelligent agriculture issue tracking and management
+                Intelligent agriculture issue tracking with AI analysis
               </p>
             </div>
             
-            {/* Create Ticket Button */}
             {user && (
               <button
                 onClick={() => setShowCreateForm(!showCreateForm)}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2 shadow-lg"
               >
-                <span>📝</span>
+                <span>{showCreateForm ? '❌' : '📝'}</span>
                 <span>{showCreateForm ? 'Cancel' : 'Report New Issue'}</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* ==================== SUCCESS MESSAGE ==================== */}
         {success && (
           <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg animate-pulse">
             <div className="flex items-center space-x-2">
@@ -219,7 +204,6 @@ export default function Tickets() {
           </div>
         )}
 
-        {/* ==================== ERROR MESSAGE ==================== */}
         {error && (
           <div className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
             <div className="flex items-center space-x-2">
@@ -229,7 +213,7 @@ export default function Tickets() {
           </div>
         )}
 
-        {/* ==================== CREATE TICKET FORM ==================== */}
+        {/* Create Form - Same as before */}
         {showCreateForm && user && (
           <div className="mb-8 bg-white rounded-lg shadow-lg p-8 border border-gray-200">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6 flex items-center space-x-2">
@@ -239,7 +223,6 @@ export default function Tickets() {
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Issue Title */}
                 <div className="md:col-span-2">
                   <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
                     Issue Title *
@@ -256,7 +239,6 @@ export default function Tickets() {
                   />
                 </div>
 
-                {/* Issue Type */}
                 <div>
                   <label htmlFor="issueType" className="block text-sm font-semibold text-gray-700 mb-2">
                     Issue Type *
@@ -277,7 +259,6 @@ export default function Tickets() {
                   </select>
                 </div>
 
-                {/* Urgency Level */}
                 <div>
                   <label htmlFor="urgencyLevel" className="block text-sm font-semibold text-gray-700 mb-2">
                     Urgency Level *
@@ -296,7 +277,6 @@ export default function Tickets() {
                   </select>
                 </div>
 
-                {/* Field Location */}
                 <div>
                   <label htmlFor="fieldLocation" className="block text-sm font-semibold text-gray-700 mb-2">
                     Field Location
@@ -312,7 +292,6 @@ export default function Tickets() {
                   />
                 </div>
 
-                {/* Affected Crop */}
                 <div>
                   <label htmlFor="affectedCrop" className="block text-sm font-semibold text-gray-700 mb-2">
                     Affected Crop
@@ -328,7 +307,6 @@ export default function Tickets() {
                   />
                 </div>
 
-                {/* Issue Description */}
                 <div className="md:col-span-2">
                   <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
                     Detailed Description *
@@ -348,7 +326,6 @@ export default function Tickets() {
                   </p>
                 </div>
 
-                {/* Estimated Impact */}
                 <div className="md:col-span-2">
                   <label htmlFor="estimatedImpact" className="block text-sm font-semibold text-gray-700 mb-2">
                     Estimated Impact
@@ -365,7 +342,6 @@ export default function Tickets() {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <div className="flex justify-end pt-4">
                 <button
                   type="submit"
@@ -393,7 +369,7 @@ export default function Tickets() {
           </div>
         )}
 
-        {/* ==================== TICKETS LIST ==================== */}
+        {/* Tickets List */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-semibold text-gray-900">
@@ -404,7 +380,6 @@ export default function Tickets() {
             </span>
           </div>
 
-          {/* Loading State */}
           {fetchingTickets ? (
             <div className="text-center py-16">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-green-600 mb-4"></div>
@@ -453,6 +428,12 @@ export default function Tickets() {
                             'bg-green-100 text-green-800'
                           }`}>
                             {ticket.urgencyLevel.toUpperCase()}
+                          </span>
+                        )}
+                        {/* AI Status Badge */}
+                        {ticket.aiSolution?.isGenerated && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-bold">
+                            🤖 AI
                           </span>
                         )}
                       </div>

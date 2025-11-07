@@ -1,30 +1,25 @@
 /**
- * TICKET.JSX - AgriAssistify.ai Single Ticket Details
- * 
- * Displays detailed information about a single farm issue ticket
- * Shows AI analysis results, assigned workers, and ticket status
- * Role-based access control for farmers, workers, moderators, and admins
+ * TICKET.JSX - AgriAssistify.ai Single Ticket Details with AI Integration
+ * Enhanced with Gemini AI Analysis Display
  */
 
-// ==================== IMPORTS ====================
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
-// ==================== TICKET DETAILS COMPONENT ====================
 export default function TicketDetailsPage() {
-  // ==================== STATE MANAGEMENT ====================
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
+  const [regenerating, setRegenerating] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   
   const token = localStorage.getItem("token");
 
-  // ==================== FETCH USER DATA ====================
+  // Fetch user data
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
@@ -32,7 +27,7 @@ export default function TicketDetailsPage() {
     }
   }, []);
 
-  // ==================== FETCH TICKET DETAILS ====================
+  // Fetch ticket details
   useEffect(() => {
     if (!token) {
       navigate('/login');
@@ -40,7 +35,16 @@ export default function TicketDetailsPage() {
     }
     
     fetchTicketDetails();
-  }, [id, token]);
+    
+    // Auto-refresh if analyzing
+    const interval = setInterval(() => {
+      if (ticket?.status === 'analyzing') {
+        fetchTicketDetails();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [id, token, ticket?.status]);
 
   const fetchTicketDetails = async () => {
     try {
@@ -69,18 +73,52 @@ export default function TicketDetailsPage() {
     }
   };
 
-  // ==================== GET STATUS COLOR ====================
+  // Regenerate AI solution
+  const handleRegenerateAI = async () => {
+    if (!confirm('Regenerate AI solution? This will replace the current analysis.')) {
+      return;
+    }
+
+    setRegenerating(true);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_URL}/api/tickets/${id}/regenerate-ai`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setTicket(data.ticket);
+        alert('AI solution regenerated successfully!');
+      } else {
+        alert(data.error || 'Failed to regenerate AI solution');
+      }
+    } catch (err) {
+      console.error('Regenerate AI error:', err);
+      alert('Network error. Please try again.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'RESOLVED': return 'bg-green-100 text-green-800 border-green-200';
-      case 'CLOSED': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'analyzing': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'open': return 'bg-green-100 text-green-800 border-green-200';
+      case 'in-progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'resolved': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  // ==================== GET PRIORITY COLOR ====================
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return 'bg-red-100 text-red-800 border-red-200';
@@ -90,10 +128,9 @@ export default function TicketDetailsPage() {
     }
   };
 
-  // ==================== GET ISSUE TYPE ICON ====================
   const getIssueTypeIcon = (issueType) => {
     switch (issueType) {
-      case 'pest': return '🐛';
+      case 'pest-attack': return '🐛';
       case 'irrigation': return '💧';
       case 'equipment': return '🔧';
       case 'disease': return '🦠';
@@ -102,7 +139,6 @@ export default function TicketDetailsPage() {
     }
   };
 
-  // ==================== RENDER LOADING STATE ====================
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -118,7 +154,6 @@ export default function TicketDetailsPage() {
     );
   }
 
-  // ==================== RENDER ERROR STATE ====================
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -139,13 +174,12 @@ export default function TicketDetailsPage() {
     );
   }
 
-  // ==================== RENDER TICKET DETAILS ====================
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        {/* ==================== HEADER ==================== */}
+      <div className="max-w-6xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="mb-8">
           <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
             <Link to="/tickets" className="hover:text-green-600">Farm Tickets</Link>
@@ -158,24 +192,23 @@ export default function TicketDetailsPage() {
               <span className="text-3xl">{getIssueTypeIcon(ticket.issueType)}</span>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{ticket.title}</h1>
-                <p className="text-gray-600">Ticket ID: {ticket.id}</p>
+                <p className="text-gray-600">Ticket ID: {ticket._id}</p>
               </div>
             </div>
             
-            {/* Status and Priority Badges */}
             <div className="flex items-center space-x-3">
               <span className={`px-3 py-1 rounded-full border text-sm font-medium ${getStatusColor(ticket.status)}`}>
-                {ticket.status}
+                {ticket.status.toUpperCase()}
               </span>
-              <span className={`px-3 py-1 rounded-full border text-sm font-medium ${getPriorityColor(ticket.priority)}`}>
-                {ticket.priority} Priority
+              <span className={`px-3 py-1 rounded-full border text-sm font-medium ${getPriorityColor(ticket.priority || ticket.urgencyLevel)}`}>
+                {(ticket.priority || ticket.urgencyLevel).toUpperCase()}
               </span>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* ==================== MAIN CONTENT ==================== */}
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             
             {/* Issue Description */}
@@ -186,51 +219,176 @@ export default function TicketDetailsPage() {
               </div>
             </div>
 
-            {/* AI Analysis Results */}
-            {ticket.aiAnalysis && (
-              <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-md p-6 border border-green-200">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  🤖 AI Analysis Results
-                </h2>
-                
-                {ticket.aiAnalysis.helpfulNotes && (
-                  <div className="mb-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Recommendations:</h3>
-                    <p className="text-gray-700 bg-white rounded p-3 border">
-                      {ticket.aiAnalysis.helpfulNotes}
+            {/* AI Analysis Status */}
+            {ticket.status === 'analyzing' && !ticket.aiSolution?.isGenerated && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <div className="flex items-center space-x-4">
+                  <div className="animate-spin h-10 w-10 border-4 border-yellow-500 border-t-transparent rounded-full"></div>
+                  <div>
+                    <h3 className="font-semibold text-yellow-900">🤖 AI is analyzing your issue...</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      This usually takes 5-10 seconds. The page will update automatically.
                     </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* AI Solution Display */}
+            {ticket.aiSolution?.isGenerated && (
+              <div className="bg-gradient-to-br from-green-50 to-blue-50 border border-green-200 rounded-xl p-6">
+                
+                {/* AI Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <span className="text-4xl mr-3">🤖</span>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">AI-Generated Solution</h2>
+                      <p className="text-sm text-gray-600">Powered by Google Gemini AI</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    {ticket.aiSolution.confidence > 0 && (
+                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                        {ticket.aiSolution.confidence}% Confidence
+                      </span>
+                    )}
+                    <button
+                      onClick={handleRegenerateAI}
+                      disabled={regenerating}
+                      className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                        regenerating
+                          ? 'bg-gray-300 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {regenerating ? 'Regenerating...' : '🔄 Regenerate'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                {ticket.aiSolution.summary && (
+                  <div className="bg-white rounded-lg p-5 mb-5 shadow-sm">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="text-xl mr-2">📋</span>
+                      Summary
+                    </h3>
+                    <p className="text-gray-700">{ticket.aiSolution.summary}</p>
                   </div>
                 )}
 
-                {ticket.aiAnalysis.relatedSkills && ticket.aiAnalysis.relatedSkills.length > 0 && (
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Required Skills:</h3>
+                {/* Main Solution */}
+                <div className="bg-white rounded-lg p-5 mb-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <span className="text-xl mr-2">💡</span>
+                    Solution
+                  </h3>
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {ticket.aiSolution.solution || ticket.aiSolution.helpfulNotes}
+                  </p>
+                </div>
+
+                {/* Recommendations */}
+                {ticket.aiSolution.recommendations && ticket.aiSolution.recommendations.length > 0 && (
+                  <div className="bg-white rounded-lg p-5 mb-5 shadow-sm">
+                    <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="text-xl mr-2">✅</span>
+                      Step-by-Step Recommendations
+                    </h3>
+                    <ol className="space-y-3">
+                      {ticket.aiSolution.recommendations.map((rec, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <span className="bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold mr-3 flex-shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="text-gray-700 flex-1">{rec}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* Possible Causes */}
+                {ticket.aiSolution.possibleCauses && ticket.aiSolution.possibleCauses.length > 0 && (
+                  <div className="bg-white rounded-lg p-5 mb-5 shadow-sm">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="text-xl mr-2">🔍</span>
+                      Possible Causes
+                    </h3>
+                    <ul className="space-y-2">
+                      {ticket.aiSolution.possibleCauses.map((cause, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <span className="text-red-500 mr-2">•</span>
+                          <span className="text-gray-700">{cause}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Prevention Tips */}
+                {ticket.aiSolution.preventionTips && ticket.aiSolution.preventionTips.length > 0 && (
+                  <div className="bg-white rounded-lg p-5 mb-5 shadow-sm">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <span className="text-xl mr-2">🛡️</span>
+                      Prevention Tips
+                    </h3>
+                    <ul className="space-y-2">
+                      {ticket.aiSolution.preventionTips.map((tip, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <span className="text-green-500 mr-2">✓</span>
+                          <span className="text-gray-700">{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Timeline & Skills */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {ticket.aiSolution.urgencyAssessment && (
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <p className="text-sm text-gray-600 mb-1">Urgency Assessment</p>
+                      <p className={`text-lg font-bold ${getPriorityColor(ticket.aiSolution.urgencyAssessment).split(' ')[1]}`}>
+                        {ticket.aiSolution.urgencyAssessment.toUpperCase()}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {ticket.aiSolution.estimatedResolutionTime && (
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <p className="text-sm text-gray-600 mb-1">Estimated Resolution Time</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        {ticket.aiSolution.estimatedResolutionTime}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Required Skills */}
+                {ticket.aiSolution.relatedSkills && ticket.aiSolution.relatedSkills.length > 0 && (
+                  <div className="mt-4 bg-white rounded-lg p-4 shadow-sm">
+                    <p className="text-sm text-gray-600 mb-2">Required Skills</p>
                     <div className="flex flex-wrap gap-2">
-                      {ticket.aiAnalysis.relatedSkills.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-                        >
+                      {ticket.aiSolution.relatedSkills.map((skill, idx) => (
+                        <span key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
                           {skill}
                         </span>
                       ))}
                     </div>
                   </div>
                 )}
+
+                <p className="text-xs text-gray-500 mt-4">
+                  AI solution generated on {new Date(ticket.aiSolution.generatedAt).toLocaleString()}
+                </p>
               </div>
             )}
-
-            {/* Updates/Comments Section */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Updates & Communication</h2>
-              <div className="text-center py-8 text-gray-500">
-                <p>💬 No updates yet</p>
-                <p className="text-sm mt-2">Updates and communications will appear here</p>
-              </div>
-            </div>
           </div>
 
-          {/* ==================== SIDEBAR ==================== */}
+          {/* Sidebar */}
           <div className="space-y-6">
             
             {/* Ticket Information */}
@@ -252,10 +410,10 @@ export default function TicketDetailsPage() {
                   </div>
                 )}
                 
-                {ticket.cropType && (
+                {ticket.affectedCrop && (
                   <div>
                     <label className="block text-sm font-medium text-gray-600">Affected Crop</label>
-                    <p className="text-gray-900">🌱 {ticket.cropType}</p>
+                    <p className="text-gray-900">🌱 {ticket.affectedCrop}</p>
                   </div>
                 )}
                 
@@ -278,27 +436,25 @@ export default function TicketDetailsPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">People Involved</h3>
               
               <div className="space-y-4">
-                {/* Reported By */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600">Reported By</label>
-                  {ticket.createdBy && (
+                  {ticket.reportedBy && (
                     <div className="flex items-center space-x-2 mt-1">
                       <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                         <span className="text-green-600 font-bold text-sm">
-                          {ticket.createdBy.name ? ticket.createdBy.name[0].toUpperCase() : ticket.createdBy.email[0].toUpperCase()}
+                          {ticket.reportedBy.name ? ticket.reportedBy.name[0].toUpperCase() : ticket.reportedBy.email[0].toUpperCase()}
                         </span>
                       </div>
                       <div>
                         <p className="text-gray-900 font-medium">
-                          {ticket.createdBy.name || ticket.createdBy.email}
+                          {ticket.reportedBy.name || ticket.reportedBy.email}
                         </p>
-                        <p className="text-gray-600 text-sm capitalize">🌱 {ticket.createdBy.role}</p>
+                        <p className="text-gray-600 text-sm capitalize">🌱 {ticket.reportedBy.role}</p>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Assigned To */}
                 <div>
                   <label className="block text-sm font-medium text-gray-600">Assigned To</label>
                   {ticket.assignedTo ? (
@@ -313,11 +469,6 @@ export default function TicketDetailsPage() {
                           {ticket.assignedTo.name || ticket.assignedTo.email}
                         </p>
                         <p className="text-gray-600 text-sm capitalize">🔧 {ticket.assignedTo.role}</p>
-                        {ticket.assignedTo.skills && ticket.assignedTo.skills.length > 0 && (
-                          <p className="text-gray-500 text-xs">
-                            Skills: {ticket.assignedTo.skills.join(', ')}
-                          </p>
-                        )}
                       </div>
                     </div>
                   ) : (
@@ -347,29 +498,6 @@ export default function TicketDetailsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Actions */}
-            {user && (user.role === 'worker' || user.role === 'moderator' || user.role === 'admin') && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-                
-                <div className="space-y-3">
-                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                    🔄 Update Status
-                  </button>
-                  
-                  <button className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
-                    💬 Add Comment
-                  </button>
-                  
-                  {user.role === 'moderator' || user.role === 'admin' ? (
-                    <button className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
-                      👤 Reassign
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -1,17 +1,14 @@
 /**
- * TICKET MODEL - AgriAssistify.ai
- * 
- * Mongoose schema for farm issue tickets
- * Structures farm issues (pest attacks, irrigation needs, equipment problems, etc.)
- * with comprehensive status tracking and assignment workflow
+ * TICKET MODEL - AgriAssistify.ai (Enhanced with AI Integration)
  * 
  * Features:
- * - Issue classification and prioritization
- * - User assignment and tracking
+ * - AI-powered solution generation with Gemini 2.5 Flash
+ * - Comprehensive issue tracking
+ * - Status management and workflow
  * - Comments and collaboration
- * - AI-powered suggestions
  * - Attachment support
- * - Resolution tracking
+ * 
+ * UPDATED: Increased character limits for detailed AI responses
  */
 
 import mongoose from "mongoose";
@@ -75,14 +72,15 @@ const ticketSchema = new mongoose.Schema(
             type: String,
             enum: {
                 values: [
-                    'open',         // Newly created, awaiting assignment
-                    'in-progress',  // Being worked on by assigned worker
-                    'resolved',     // Solution provided, awaiting confirmation
-                    'closed'        // Confirmed resolved and closed
+                    'open',           // Newly created, awaiting assignment
+                    'analyzing',      // AI is analyzing the issue
+                    'in-progress',    // Being worked on by assigned worker
+                    'resolved',       // Solution provided, awaiting confirmation
+                    'closed'          // Confirmed resolved and closed
                 ],
                 message: '{VALUE} is not a valid status'
             },
-            default: 'open'
+            default: 'analyzing'  // Changed to analyzing for AI integration
         },
 
         // ==================== FARM & LOCATION DETAILS ====================
@@ -121,10 +119,70 @@ const ticketSchema = new mongoose.Schema(
         farmId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Farm'
-            // Optional - not all users may have farm documents
         },
 
-        // ==================== SKILL & AI FEATURES ====================
+        // ==================== AI SOLUTION FIELD (ENHANCED FOR GEMINI 2.5 FLASH) ====================
+        aiSolution: {
+            isGenerated: {
+                type: Boolean,
+                default: false
+            },
+            generatedAt: {
+                type: Date
+            },
+            summary: {
+                type: String,
+                trim: true,
+                maxlength: [500, "Summary cannot exceed 500 characters"]  // ✅ Kept at 500
+            },
+            solution: {
+                type: String,
+                trim: true,
+                maxlength: [5000, "Solution cannot exceed 5000 characters"]  // ✅ INCREASED from 2000 to 5000
+            },
+            recommendations: [{
+                type: String,
+                trim: true,
+                maxlength: [500, "Recommendation cannot exceed 500 characters"]  // ✅ Kept at 500 (detailed steps)
+            }],
+            possibleCauses: [{
+                type: String,
+                trim: true,
+                maxlength: [400, "Cause cannot exceed 400 characters"]  // ✅ INCREASED from 300 to 400
+            }],
+            preventionTips: [{
+                type: String,
+                trim: true,
+                maxlength: [500, "Prevention tip cannot exceed 500 characters"]  // ✅ INCREASED from 300 to 500
+            }],
+            urgencyAssessment: {
+                type: String,
+                enum: ['low', 'medium', 'high', 'critical'],
+                default: 'medium'
+            },
+            estimatedResolutionTime: {
+                type: String,
+                trim: true,
+                maxlength: [100, "Resolution time estimate cannot exceed 100 characters"]  // ✅ Kept at 100
+            },
+            confidence: {
+                type: Number,
+                min: 0,
+                max: 100,
+                default: 75
+            },
+            relatedSkills: [{
+                type: String,
+                trim: true
+            }],
+            helpfulNotes: {
+                type: String,
+                trim: true,
+                maxlength: [2000, "Helpful notes cannot exceed 2000 characters"]  // ✅ INCREASED from 1000 to 2000
+            }
+        },
+
+        // ==================== SKILL & AI FEATURES (LEGACY) ====================
         requiredSkills: {
             type: [String],
             default: [],
@@ -198,17 +256,17 @@ const ticketSchema = new mongoose.Schema(
         }
     },
     {
-        timestamps: true  // Automatically adds createdAt and updatedAt fields
+        timestamps: true
     }
 );
 
 // ==================== INDEXES FOR PERFORMANCE ====================
-// Composite index for common queries
 ticketSchema.index({ reportedBy: 1, status: 1 });
 ticketSchema.index({ assignedTo: 1, status: 1 });
 ticketSchema.index({ status: 1, priority: 1 });
 ticketSchema.index({ issueType: 1, urgencyLevel: 1 });
 ticketSchema.index({ createdAt: -1 });
+ticketSchema.index({ 'aiSolution.isGenerated': 1 });
 
 // Text index for search functionality
 ticketSchema.index({ 
@@ -217,20 +275,22 @@ ticketSchema.index({
 });
 
 // ==================== VIRTUAL PROPERTIES ====================
-// Calculate time elapsed since creation
 ticketSchema.virtual('age').get(function() {
-    return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24)); // Days
+    return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
 });
 
-// Check if ticket is overdue (open for more than 7 days)
 ticketSchema.virtual('isOverdue').get(function() {
     if (this.status === 'closed' || this.status === 'resolved') return false;
     const daysSinceCreation = Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
     return daysSinceCreation > 7;
 });
 
+// Check if AI solution is ready
+ticketSchema.virtual('hasAISolution').get(function() {
+    return this.aiSolution && this.aiSolution.isGenerated === true;
+});
+
 // ==================== INSTANCE METHODS ====================
-// Add comment to ticket
 ticketSchema.methods.addComment = function(userId, text) {
     this.comments.push({
         user: userId,
@@ -240,14 +300,12 @@ ticketSchema.methods.addComment = function(userId, text) {
     return this.save();
 };
 
-// Assign ticket to worker
 ticketSchema.methods.assignTo = function(workerId) {
     this.assignedTo = workerId;
     this.status = 'in-progress';
     return this.save();
 };
 
-// Resolve ticket
 ticketSchema.methods.resolve = function(userId, resolutionText) {
     this.status = 'resolved';
     this.resolution = resolutionText;
@@ -256,14 +314,42 @@ ticketSchema.methods.resolve = function(userId, resolutionText) {
     return this.save();
 };
 
-// Close ticket
 ticketSchema.methods.close = function() {
     this.status = 'closed';
     return this.save();
 };
 
+// New method: Set AI solution (Enhanced for Gemini 2.5 Flash)
+ticketSchema.methods.setAISolution = function(aiData) {
+    this.aiSolution = {
+        isGenerated: true,
+        generatedAt: new Date(),
+        summary: aiData.summary || '',
+        solution: aiData.solution || aiData.helpfulNotes || '',
+        recommendations: aiData.recommendations || [],
+        possibleCauses: aiData.possibleCauses || [],
+        preventionTips: aiData.preventionTips || [],
+        urgencyAssessment: aiData.urgencyAssessment || aiData.priority || 'medium',
+        estimatedResolutionTime: aiData.estimatedResolutionTime || 'To be determined',
+        confidence: aiData.confidence || 75,
+        relatedSkills: aiData.relatedSkills || [],
+        helpfulNotes: aiData.helpfulNotes || ''
+    };
+    
+    // Update required skills from AI
+    if (aiData.relatedSkills && aiData.relatedSkills.length > 0) {
+        this.requiredSkills = aiData.relatedSkills;
+    }
+    
+    // Update status to open after AI analysis
+    if (this.status === 'analyzing') {
+        this.status = 'open';
+    }
+    
+    return this.save();
+};
+
 // ==================== STATIC METHODS ====================
-// Find tickets by status
 ticketSchema.statics.findByStatus = function(status) {
     return this.find({ status })
         .populate('reportedBy', 'name email role')
@@ -271,7 +357,6 @@ ticketSchema.statics.findByStatus = function(status) {
         .sort({ createdAt: -1 });
 };
 
-// Find urgent tickets
 ticketSchema.statics.findUrgent = function() {
     return this.find({ 
         urgencyLevel: 'high',
@@ -281,7 +366,6 @@ ticketSchema.statics.findUrgent = function() {
         .sort({ createdAt: -1 });
 };
 
-// Get statistics
 ticketSchema.statics.getStats = async function() {
     const stats = await this.aggregate([
         {
@@ -294,8 +378,15 @@ ticketSchema.statics.getStats = async function() {
     return stats;
 };
 
+// Get tickets pending AI analysis
+ticketSchema.statics.findPendingAI = function() {
+    return this.find({ 
+        status: 'analyzing',
+        'aiSolution.isGenerated': false
+    }).sort({ createdAt: 1 });
+};
+
 // ==================== PRE-SAVE MIDDLEWARE ====================
-// Auto-update priority based on urgency and age
 ticketSchema.pre('save', function(next) {
     if (this.isNew || this.isModified('urgencyLevel')) {
         if (this.urgencyLevel === 'high') {

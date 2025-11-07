@@ -1,8 +1,19 @@
+/**
+ * TICKET CONTROLLER - AgriAssistify.ai
+ * Enhanced with Detailed Logging + Gemini AI Integration
+ */
+
 import Ticket from "../models/ticket.js";
 import User from "../models/user.js";
 import { inngest } from "../inngest/client.js";
 import { sendTicketCreatedEmail, sendExpertAssignmentEmail } from "../utilities/mailer.js";
+import analyzeTicket from "../utilities/ticketAnalyzer.js";
 
+/**
+ * @route   POST /api/tickets
+ * @desc    Create new ticket with automatic AI analysis
+ * @access  Private
+ */
 const createTicket = async (req, res) => {
     try {
         const {
@@ -16,12 +27,14 @@ const createTicket = async (req, res) => {
         } = req.body;
 
         console.log("📝 Creating ticket:", {
-            title,
+            title: title?.substring(0, 50) + '...',
             issueType,
             urgencyLevel,
-            reportedBy: req.user._id
+            reportedBy: req.user._id,
+            reporterEmail: req.user.email
         });
 
+        // Validation
         if (!title || !description || !issueType) {
             return res.status(400).json({
                 success: false,
@@ -61,6 +74,7 @@ const createTicket = async (req, res) => {
 
         const reportedBy = req.user._id;
 
+        // Create ticket with 'analyzing' status for AI processing
         const ticket = await Ticket.create({
             title: title.trim(),
             description: description.trim(),
@@ -70,22 +84,27 @@ const createTicket = async (req, res) => {
             affectedCrop: affectedCrop?.trim(),
             estimatedImpact: estimatedImpact?.trim(),
             reportedBy,
-            status: 'open',
+            status: 'analyzing', // AI will update this
             createdAt: new Date(),
             updatedAt: new Date()
         });
 
         await ticket.populate('reportedBy', 'name email role');
 
-        console.log("✅ Ticket created successfully:", ticket._id);
+        console.log("✅ Ticket created:", ticket._id);
+        console.log("   Title:", ticket.title.substring(0, 50) + '...');
+        console.log("   Type:", ticket.issueType);
+        console.log("   Status:", ticket.status);
 
+        // Send confirmation email (non-blocking)
         try {
             await sendTicketCreatedEmail(req.user, ticket);
-            console.log(`✅ Ticket creation email sent to ${req.user.email}`);
+            console.log(`📧 Ticket creation email sent to ${req.user.email}`);
         } catch (emailError) {
-            console.error("❌ Ticket creation email failed:", emailError.message);
+            console.error("❌ Email failed:", emailError.message);
         }
 
+        // Trigger Inngest background job (non-blocking)
         try {
             await inngest.send({
                 name: "ticket/created",
@@ -99,14 +118,17 @@ const createTicket = async (req, res) => {
                     userEmail: req.user.email
                 }
             });
-            console.log("🤖 AI analysis queued for ticket:", ticket._id);
+            console.log("🔔 Inngest event queued for ticket:", ticket._id);
         } catch (inngestError) {
             console.log("⚠️ Inngest error (non-critical):", inngestError.message);
         }
 
+        // Start direct AI analysis in background
+        generateAISolutionBackground(ticket._id);
+
         res.status(201).json({
             success: true,
-            message: "Farm issue reported successfully! Confirmation email sent.",
+            message: "Farm issue reported successfully! AI is analyzing your issue.",
             ticket
         });
 
@@ -129,6 +151,76 @@ const createTicket = async (req, res) => {
     }
 };
 
+/**
+ * Background AI solution generator with detailed logging
+ * Runs async without blocking the response
+ */
+async function generateAISolutionBackground(ticketId) {
+    try {
+        console.log('🤖 Starting background AI analysis for ticket:', ticketId);
+
+        // Wait a moment to ensure ticket is fully saved
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const ticket = await Ticket.findById(ticketId);
+        if (!ticket) {
+            console.error('❌ Ticket not found:', ticketId);
+            return;
+        }
+
+        console.log('📄 Ticket loaded for AI analysis');
+        console.log('   Title:', ticket.title.substring(0, 50) + '...');
+        console.log('   Description length:', ticket.description.length, 'chars');
+
+        // Generate AI solution
+        const aiResult = await analyzeTicket(ticket);
+
+        if (aiResult && aiResult.solution) {
+            console.log('✅ AI analysis completed successfully');
+            console.log('   Confidence:', aiResult.confidence || 'N/A');
+            console.log('   Recommendations:', aiResult.recommendations?.length || 0);
+            
+            // Save AI solution using the model method
+            await ticket.setAISolution(aiResult);
+            console.log('✅ AI solution saved for ticket:', ticketId);
+            
+            // Log final status
+            const updatedTicket = await Ticket.findById(ticketId);
+            console.log('   Final status:', updatedTicket.status);
+            console.log('   AI generated:', updatedTicket.aiSolution?.isGenerated || false);
+        } else {
+            console.error('❌ AI analysis failed for ticket:', ticketId);
+            console.log('   Updating ticket status to "open"');
+            
+            // Update status to open even if AI fails
+            ticket.status = 'open';
+            await ticket.save();
+            
+            console.log('⚠️ Ticket opened without AI solution');
+        }
+
+    } catch (error) {
+        console.error('❌ Background AI generation error:');
+        console.error('   Ticket ID:', ticketId);
+        console.error('   Error Type:', error.name);
+        console.error('   Error Message:', error.message);
+        console.error('   Stack:', error.stack?.substring(0, 200));
+        
+        // Ensure ticket doesn't stay in 'analyzing' state
+        try {
+            await Ticket.findByIdAndUpdate(ticketId, { status: 'open' });
+            console.log('⚠️ Ticket status updated to "open" after AI failure');
+        } catch (updateError) {
+            console.error('❌ Failed to update ticket status:', updateError.message);
+        }
+    }
+}
+
+/**
+ * @route   GET /api/tickets
+ * @desc    Get all tickets with filters
+ * @access  Private
+ */
 const getTickets = async (req, res) => {
     try {
         const { 
@@ -146,8 +238,10 @@ const getTickets = async (req, res) => {
 
         let filter = {};
         
+        // Role-based filtering
         if (req.user.role === 'farmer') {
             filter.reportedBy = req.user._id;
+            console.log("   Filtering: farmer's own tickets");
         }
         
         if (req.user.role === 'worker') {
@@ -162,18 +256,31 @@ const getTickets = async (req, res) => {
                     })
                 }
             ];
+            console.log("   Filtering: assigned + matching skills");
         }
 
-        if (status) filter.status = status;
-        if (issueType) filter.issueType = issueType;
-        if (urgencyLevel) filter.urgencyLevel = urgencyLevel;
+        // Apply filters
+        if (status) {
+            filter.status = status;
+            console.log("   Filter: status =", status);
+        }
+        if (issueType) {
+            filter.issueType = issueType;
+            console.log("   Filter: issueType =", issueType);
+        }
+        if (urgencyLevel) {
+            filter.urgencyLevel = urgencyLevel;
+            console.log("   Filter: urgencyLevel =", urgencyLevel);
+        }
 
+        // Search functionality
         if (search) {
             filter.$or = [
                 { title: { $regex: search, $options: 'i' } },
                 { description: { $regex: search, $options: 'i' } },
                 { affectedCrop: { $regex: search, $options: 'i' } }
             ];
+            console.log("   Search term:", search);
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -190,7 +297,7 @@ const getTickets = async (req, res) => {
         const totalTickets = await Ticket.countDocuments(filter);
         const totalPages = Math.ceil(totalTickets / parseInt(limit));
 
-        console.log(`✅ Found ${tickets.length} tickets (${totalTickets} total)`);
+        console.log(`✅ Found ${tickets.length} tickets (page ${page}/${totalPages}, total: ${totalTickets})`);
 
         res.status(200).json({
             success: true,
@@ -214,6 +321,11 @@ const getTickets = async (req, res) => {
     }
 };
 
+/**
+ * @route   GET /api/tickets/:id
+ * @desc    Get single ticket with AI solution
+ * @access  Private
+ */
 const getTicket = async (req, res) => {
     try {
         const { id } = req.params;
@@ -234,30 +346,47 @@ const getTicket = async (req, res) => {
             .populate('resolvedBy', 'name email role');
 
         if (!ticket) {
+            console.log("❌ Ticket not found:", id);
             return res.status(404).json({
                 success: false,
                 error: "Ticket not found"
             });
         }
 
+        console.log("✅ Ticket found");
+        console.log("   Status:", ticket.status);
+        console.log("   AI Generated:", ticket.aiSolution?.isGenerated || false);
+
+        // Authorization check
         const isReporter = ticket.reportedBy._id.toString() === req.user._id.toString();
         const isAssignee = ticket.assignedTo && ticket.assignedTo._id.toString() === req.user._id.toString();
         const isModerator = ['moderator', 'admin'].includes(req.user.role);
 
         if (!isReporter && !isAssignee && !isModerator) {
+            console.log("❌ Unauthorized access attempt by:", req.user._id);
             return res.status(403).json({
                 success: false,
                 error: "Not authorized to view this ticket"
             });
         }
 
+        // Track last viewed by assignee
         if (isAssignee) {
             await Ticket.findByIdAndUpdate(id, { 
                 lastViewedByAssignee: new Date() 
             });
+            console.log("📝 Updated last viewed timestamp");
         }
 
-        console.log("✅ Ticket fetched successfully");
+        // Check if AI is still analyzing
+        if (ticket.status === 'analyzing' && !ticket.aiSolution?.isGenerated) {
+            console.log("⏳ AI still analyzing ticket");
+            return res.json({
+                success: true,
+                ticket,
+                message: 'AI is still analyzing your issue. Please refresh in a moment.'
+            });
+        }
 
         res.status(200).json({
             success: true,
@@ -274,12 +403,58 @@ const getTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   GET /api/tickets/my-tickets
+ * @desc    Get tickets created by current user
+ * @access  Private
+ */
+const getMyTickets = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { status } = req.query;
+
+        console.log("👤 Fetching tickets for user:", userId);
+
+        let filter = { reportedBy: userId };
+        if (status) {
+            filter.status = status;
+            console.log("   Filter: status =", status);
+        }
+
+        const tickets = await Ticket.find(filter)
+            .populate('assignedTo', 'name email role')
+            .sort({ createdAt: -1 });
+
+        console.log(`✅ Found ${tickets.length} tickets for user`);
+
+        res.status(200).json({
+            success: true,
+            count: tickets.length,
+            tickets
+        });
+
+    } catch (error) {
+        console.error("❌ Get my tickets error:", error);
+        res.status(500).json({
+            success: false,
+            error: "Failed to fetch your tickets",
+            details: process.env.NODE_ENV === 'development' ? error.message : "Internal server error"
+        });
+    }
+};
+
+/**
+ * @route   PUT /api/tickets/:id
+ * @desc    Update ticket
+ * @access  Private
+ */
 const updateTicket = async (req, res) => {
     try {
         const { id } = req.params;
         let updates = req.body;
 
-        console.log("✏️ Updating ticket:", id, "Updates:", updates);
+        console.log("✏️ Updating ticket:", id);
+        console.log("   Updates:", Object.keys(updates));
 
         const ticket = await Ticket.findById(id);
 
@@ -290,6 +465,7 @@ const updateTicket = async (req, res) => {
             });
         }
 
+        // Authorization
         const isOwner = ticket.reportedBy.toString() === req.user._id.toString();
         const isAssignee = ticket.assignedTo && ticket.assignedTo.toString() === req.user._id.toString();
         const isModerator = ['moderator', 'admin'].includes(req.user.role);
@@ -301,6 +477,7 @@ const updateTicket = async (req, res) => {
             });
         }
 
+        // Farmers can only update open tickets
         if (req.user.role === 'farmer') {
             if (ticket.status !== 'open') {
                 return res.status(403).json({
@@ -319,10 +496,12 @@ const updateTicket = async (req, res) => {
             });
             
             updates = filteredUpdates;
+            console.log("   Allowed updates for farmer:", Object.keys(updates));
         }
 
         updates.updatedAt = new Date();
 
+        // Validation
         if (updates.title && updates.title.trim().length < 10) {
             return res.status(400).json({
                 success: false,
@@ -363,6 +542,11 @@ const updateTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   POST /api/tickets/:id/assign
+ * @desc    Assign ticket to worker
+ * @access  Private (Moderator/Admin only)
+ */
 const assignTicket = async (req, res) => {
     try {
         const { id } = req.params;
@@ -399,6 +583,8 @@ const assignTicket = async (req, res) => {
             });
         }
 
+        console.log("   Worker found:", worker.name, "Skills:", worker.skills || []);
+
         const ticket = await Ticket.findById(id)
             .populate('reportedBy', 'name email role');
 
@@ -422,9 +608,10 @@ const assignTicket = async (req, res) => {
             .populate('reportedBy', 'name email role')
             .populate('assignedTo', 'name email role skills');
 
+        // Send assignment email
         try {
             await sendExpertAssignmentEmail(worker, updatedTicket, ticket.reportedBy);
-            console.log(`✅ Assignment email sent to expert ${worker.email}`);
+            console.log(`📧 Assignment email sent to ${worker.email}`);
         } catch (emailError) {
             console.error("❌ Assignment email failed:", emailError.message);
         }
@@ -433,7 +620,7 @@ const assignTicket = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: "Ticket assigned successfully and expert notified via email",
+            message: "Ticket assigned successfully",
             ticket: updatedTicket
         });
 
@@ -447,6 +634,11 @@ const assignTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   POST /api/tickets/:id/comment
+ * @desc    Add comment to ticket
+ * @access  Private
+ */
 const addComment = async (req, res) => {
     try {
         const { id } = req.params;
@@ -530,6 +722,11 @@ const addComment = async (req, res) => {
     }
 };
 
+/**
+ * @route   POST /api/tickets/:id/resolve
+ * @desc    Resolve ticket
+ * @access  Private
+ */
 const resolveTicket = async (req, res) => {
     try {
         const { id } = req.params;
@@ -588,6 +785,7 @@ const resolveTicket = async (req, res) => {
             .populate('resolvedBy', 'name email role');
 
         console.log("✅ Ticket resolved successfully");
+        console.log("   Resolved by:", req.user.name);
 
         res.status(200).json({
             success: true,
@@ -605,6 +803,11 @@ const resolveTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   POST /api/tickets/:id/close
+ * @desc    Close ticket
+ * @access  Private
+ */
 const closeTicket = async (req, res) => {
     try {
         const { id } = req.params;
@@ -670,6 +873,11 @@ const closeTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   DELETE /api/tickets/:id
+ * @desc    Delete ticket
+ * @access  Private (Moderator/Admin only)
+ */
 const deleteTicket = async (req, res) => {
     try {
         const { id } = req.params;
@@ -711,13 +919,19 @@ const deleteTicket = async (req, res) => {
     }
 };
 
+/**
+ * @route   GET /api/tickets/stats
+ * @desc    Get ticket statistics
+ * @access  Private
+ */
 const getStats = async (req, res) => {
     try {
-        console.log("📊 Fetching comprehensive ticket statistics");
+        console.log("📊 Fetching ticket statistics");
 
         const [
             totalTickets,
             openTickets,
+            analyzingTickets,
             inProgressTickets,
             resolvedTickets,
             closedTickets,
@@ -728,6 +942,7 @@ const getStats = async (req, res) => {
         ] = await Promise.all([
             Ticket.countDocuments(),
             Ticket.countDocuments({ status: 'open' }),
+            Ticket.countDocuments({ status: 'analyzing' }),
             Ticket.countDocuments({ status: 'in-progress' }),
             Ticket.countDocuments({ status: 'resolved' }),
             Ticket.countDocuments({ status: 'closed' }),
@@ -757,7 +972,12 @@ const getStats = async (req, res) => {
             ])
         ]);
 
-        console.log("✅ Statistics fetched successfully");
+        console.log("✅ Statistics compiled");
+        console.log("   Total:", totalTickets);
+        console.log("   Analyzing:", analyzingTickets);
+        console.log("   Open:", openTickets);
+        console.log("   In Progress:", inProgressTickets);
+        console.log("   Resolved:", resolvedTickets);
 
         res.status(200).json({
             success: true,
@@ -765,6 +985,7 @@ const getStats = async (req, res) => {
                 overview: {
                     total: totalTickets,
                     open: openTickets,
+                    analyzing: analyzingTickets,
                     inProgress: inProgressTickets,
                     resolved: resolvedTickets,
                     closed: closedTickets,
@@ -789,41 +1010,91 @@ const getStats = async (req, res) => {
     }
 };
 
-const getMyTickets = async (req, res) => {
+/**
+ * @route   POST /api/tickets/:id/regenerate-ai
+ * @desc    Regenerate AI solution for ticket
+ * @access  Private
+ */
+const regenerateAISolution = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const { status } = req.query;
+        const { id } = req.params;
 
-        console.log("👤 Fetching tickets for user:", userId);
+        console.log('🔄 Regenerating AI solution for ticket:', id);
 
-        let filter = { reportedBy: userId };
-        if (status) {
-            filter.status = status;
+        const ticket = await Ticket.findById(id);
+
+        if (!ticket) {
+            return res.status(404).json({
+                success: false,
+                error: 'Ticket not found'
+            });
         }
 
-        const tickets = await Ticket.find(filter)
-            .populate('assignedTo', 'name email role')
-            .sort({ createdAt: -1 });
+        // Authorization check
+        const isReporter = ticket.reportedBy.toString() === req.user._id.toString();
+        const isModerator = ['moderator', 'admin'].includes(req.user.role);
 
-        console.log(`✅ Found ${tickets.length} tickets for user`);
+        if (!isReporter && !isModerator) {
+            return res.status(403).json({
+                success: false,
+                error: 'Not authorized to regenerate AI solution for this ticket'
+            });
+        }
 
-        res.status(200).json({
-            success: true,
-            count: tickets.length,
-            tickets
-        });
+        console.log('   Setting ticket to analyzing status...');
+
+        // Set status to analyzing
+        ticket.status = 'analyzing';
+        ticket.aiSolution = {
+            isGenerated: false
+        };
+        await ticket.save();
+
+        console.log('   Calling AI analyzer...');
+
+        // Generate new AI solution
+        const aiResult = await analyzeTicket(ticket);
+
+        if (aiResult && aiResult.solution) {
+            console.log('   AI analysis successful, saving...');
+            await ticket.setAISolution(aiResult);
+            
+            const updatedTicket = await Ticket.findById(id)
+                .populate('reportedBy', 'name email role')
+                .populate('assignedTo', 'name email role skills');
+
+            console.log('✅ AI solution regenerated successfully');
+            console.log('   Confidence:', aiResult.confidence || 'N/A');
+
+            res.json({
+                success: true,
+                message: 'AI solution regenerated successfully',
+                ticket: updatedTicket
+            });
+        } else {
+            console.error('❌ AI regeneration failed');
+            ticket.status = 'open';
+            await ticket.save();
+
+            res.status(500).json({
+                success: false,
+                error: 'Failed to regenerate AI solution'
+            });
+        }
 
     } catch (error) {
-        console.error("❌ Get my tickets error:", error);
+        console.error('❌ Regenerate AI solution error:', error);
         res.status(500).json({
             success: false,
-            error: "Failed to fetch your tickets",
-            details: process.env.NODE_ENV === 'development' ? error.message : "Internal server error"
+            error: 'Failed to regenerate AI solution',
+            details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
         });
     }
 };
 
-// Single export block - no duplicates
+/**
+ * Export all controller functions
+ */
 export {
     createTicket,
     getTickets,
@@ -835,5 +1106,6 @@ export {
     resolveTicket,
     closeTicket,
     getStats,
-    getMyTickets
+    getMyTickets,
+    regenerateAISolution
 };
