@@ -154,10 +154,10 @@ export default function LoginPage() {
                 type="email"
                 id="email"
                 name="email"
-                placeholder="kunal123@gmail.com"
+                placeholder="Enter Your Email"
                 className={`w-full px-4 py-3 border ${
                   errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-gray-900`}
+                } rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-white-900`}
                 value={form.email}
                 onChange={handleChange}
                 required
@@ -179,10 +179,10 @@ export default function LoginPage() {
                 type="password"
                 id="password"
                 name="password"
-                placeholder="••••••••"
+                placeholder="Enter Your Password"
                 className={`w-full px-4 py-3 border ${
                   errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-gray-900`}
+                } rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 text-white-900`}
                 value={form.password}
                 onChange={handleChange}
                 minLength="6"
@@ -194,21 +194,6 @@ export default function LoginPage() {
                   {errors.password}
                 </p>
               )}
-            </div>
-
-            {/* ==================== REMEMBER ME & FORGOT PASSWORD ==================== */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                  Remember me
-                </label>
-              </div>
             </div>
           </div>
 
