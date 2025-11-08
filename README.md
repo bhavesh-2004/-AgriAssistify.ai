@@ -7,7 +7,7 @@
 AgriAssistify.ai is a comprehensive agricultural support platform that bridges the gap between farmers facing crop challenges and qualified agricultural experts. Using AI-powered analysis and intelligent matching, we ensure farmers get the right help at the right time.
 
 
-🚀 Tech Stack: React.js, Node.js, MongoDB, JWT Authentication, Nodemailer, AI Integration
+🚀 Tech Stack: React.js, Node.js, MongoDB, JWT Authentication, Web3Forms Integration, AI Integration
 🎯 Users: Farmers, Agricultural Workers, Moderators, Admins
 📱 Features: Issue tracking, Expert matching, Real-time notifications, Analytics dashboard
 
