@@ -76,15 +76,15 @@ const corsOptions = {
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 200,
-  maxAge: 600 // Cache preflight requests for 10 minutes
+  maxAge: 600, // Cache preflight requests for 10 minutes
+  preflightContinue: false // Important: Let CORS middleware handle OPTIONS
 }
 
 // ==================== MIDDLEWARE CONFIGURATION ====================
 // IMPORTANT: CORS must be applied BEFORE other middleware
 app.use(cors(corsOptions))
 
-// Handle preflight requests explicitly
-app.options('*', cors(corsOptions))
+// ✅ REMOVED: app.options('*', cors(corsOptions)) - This line was causing PathError
 
 // Parse JSON payloads from requests
 app.use(express.json({ limit: '10mb' }))
@@ -103,7 +103,7 @@ app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
     message: "🌾 AgriAssistify.ai Backend Server is running!",
-    version: "2.0.0",
+    version: "2.1.0",
     features: {
       authentication: true,
       ticketManagement: true,
@@ -169,7 +169,7 @@ app.use((err, req, res, next) => {
   console.error('🔥 Server Error:', err.stack)
   
   // Handle CORS errors
-  if (err.message.includes('CORS')) {
+  if (err.message && err.message.includes('CORS')) {
     return res.status(403).json({
       success: false,
       error: 'CORS Error',
