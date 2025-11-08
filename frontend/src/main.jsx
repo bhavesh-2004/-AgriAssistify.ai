@@ -1,6 +1,6 @@
 /**
  * MAIN.JSX - AgriAssistify.ai Frontend Entry Point
- * Fixed import paths to match your existing files
+ * Complete routing with Help & Documentation page
  */
 
 import { StrictMode } from 'react'
@@ -13,9 +13,9 @@ import CheckAuth from './components/auth.jsx'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 
-// ✅ CORRECTED PAGE IMPORTS - Match your actual file names
-import Home from './pages/home.jsx'        // ✅ lowercase 'home'
-import Contact from './pages/contact.jsx'  // ✅ lowercase 'contact'  
+// ✅ PAGE IMPORTS - Match your actual file names
+import Home from './pages/home.jsx'        
+import Contact from './pages/contact.jsx'  
 import Dashboard from './pages/dashboard.jsx'
 import Tickets from './pages/tickets.jsx'
 import Ticket from './pages/ticket.jsx'       
@@ -24,6 +24,7 @@ import Signup from './pages/signup.jsx'
 import Admin from './pages/admin.jsx'
 import Profile from './pages/profile.jsx'
 import About from './pages/about.jsx'
+import HelpDocs from './pages/HelpDocs.jsx'  // ✅ NEW: Help & Documentation
 
 // Layout wrapper
 const Layout = ({ children }) => (
@@ -51,10 +52,10 @@ const NotFound = () => (
           🏠 Return Home
         </a>
         <a
-          href="/about"
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors duration-200 inline-block"
+          href="/help"
+          className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 inline-block"
         >
-          📖 Learn About Platform
+          📚 Get Help
         </a>
       </div>
     </div>
@@ -66,21 +67,22 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+        {/* ==================== PUBLIC ROUTES ==================== */}
         <Route path="/" element={<CheckAuth protectedRoute={false}><Home /></CheckAuth>} />
         <Route path="/login" element={<CheckAuth protectedRoute={false}><Login /></CheckAuth>} />
         <Route path="/signup" element={<CheckAuth protectedRoute={false}><Signup /></CheckAuth>} />
         <Route path="/about" element={<CheckAuth protectedRoute={false}><About /></CheckAuth>} />
         <Route path="/contact" element={<CheckAuth protectedRoute={false}><Contact /></CheckAuth>} />
+        <Route path="/help" element={<CheckAuth protectedRoute={false}><HelpDocs /></CheckAuth>} />
         
-        {/* Protected Routes */}
+        {/* ==================== PROTECTED ROUTES ==================== */}
         <Route path="/dashboard" element={<CheckAuth protectedRoute={true}><Dashboard /></CheckAuth>} />
         <Route path="/tickets" element={<CheckAuth protectedRoute={true}><Tickets /></CheckAuth>} />
         <Route path="/tickets/:id" element={<CheckAuth protectedRoute={true}><Ticket /></CheckAuth>} />
         <Route path="/profile" element={<CheckAuth protectedRoute={true}><Profile /></CheckAuth>} />
         <Route path="/admin" element={<CheckAuth protectedRoute={true}><Admin /></CheckAuth>} />
         
-        {/* 404 Fallback */}
+        {/* ==================== 404 FALLBACK ==================== */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

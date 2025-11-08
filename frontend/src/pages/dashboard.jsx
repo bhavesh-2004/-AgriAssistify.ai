@@ -441,64 +441,15 @@ export default function Dashboard() {
               <span className="text-sm font-medium text-gray-700">Profile</span>
             </Link>
             
-            <button
-              onClick={() => window.open('https://docs.agriassistify.ai', '_blank')}
+            <Link
+              to="/help"
               className="bg-white hover:bg-yellow-50 p-4 rounded-lg text-center transition-colors group border border-yellow-200"
             >
               <span className="text-2xl block mb-2 group-hover:scale-110 transition-transform">📚</span>
               <span className="text-sm font-medium text-gray-700">Help & Docs</span>
-            </button>
+            </Link>
           </div>
         </div>
-
-        {/* ==================== AI INSIGHTS SECTION ==================== */}
-        {dashboardData.stats.totalTickets > 0 && (
-          <div className="mt-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-              <span>🤖</span>
-              <span>AI Insights</span>
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-2">System Performance</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Resolution Rate</span>
-                    <span className="text-sm font-medium">
-                      {dashboardData.stats.totalTickets > 0 
-                        ? Math.round((dashboardData.stats.resolvedTickets / dashboardData.stats.totalTickets) * 100)
-                        : 0}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${dashboardData.stats.totalTickets > 0 
-                          ? (dashboardData.stats.resolvedTickets / dashboardData.stats.totalTickets) * 100
-                          : 0}%`
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  {dashboardData.stats.pendingTickets > 3 && (
-                    <li>• Consider adding more agricultural workers</li>
-                  )}
-                  {dashboardData.stats.resolvedTickets > dashboardData.stats.totalTickets * 0.8 && (
-                    <li>• Excellent resolution rate! 🎉</li>
-                  )}
-                  <li>• Regular preventive measures can reduce issues</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <Footer />
